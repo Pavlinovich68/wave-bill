@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/pref.css">
+    <link rel="stylesheet" href="css/fontawesome.min.css">
+    <script src="js/common.js"></script>
+</head>
+<body>
+  <div class="app">
+      <div class="header">
+          <div class="sp"></div>
+          <div class="icon">
+              <i class="fa fa-qrcode" aria-hidden="true"></i>
+          </div>
+          <div class="title" id="app-title"></div>
+          <div class="win-btn btn-min"><i class="fa fa-window-minimize"></i></div>
+          <div class="win-btn btn-max"><i class="fa fa-window-maximize"></i></div>
+          <div class="win-btn btn_close"><i class="fa fa-window-close"></i></div>
+      </div>
+      <ul class="nav nav-tabs" role="tablist" id="myTab">
+          <li class="nav-item" role="presentation">
+              <button class="nav-link active" id="house-list-tab" data-bs-toggle="tab" data-bs-target="#houseListTab" type="button" role="tab" aria-controls="houseListTab" aria-selected="true">Перечень домов</button>
+          </li>
+          <li class="nav-item" role="presentation">
+              <button class="nav-link" id="print-area-tab" data-bs-toggle="tab" data-bs-target="#printAreaTab" type="button" role="tab" aria-controls="printAreaTab" aria-selected="false">Область печати</button>
+          </li>
+          <li class="nav-item" role="presentation">
+              <button class="nav-link" id="pref-tab" data-bs-toggle="tab" data-bs-target="#prefTab" type="button" role="tab" aria-controls="prefTab" aria-selected="false">Настройки</button>
+          </li>
+          <li class="nav-item" role="presentation">
+              <button class="nav-link" id="errors-tab" data-bs-toggle="tab" data-bs-target="#errorsTab" type="button" role="tab" aria-controls="errorsTab" aria-selected="false">Ошибки</button>
+          </li>
+      </ul>
+      <div class="tab-content">
+          <div class="tab-pane fade show active house-list-tab" id="houseListTab" role="tabpanel" aria-labelledby="house-list-tab">
+              <div class="content-area">
+                  <div class="content-fill container-fluid" id="houseGrid"></div>
+                  <div class="content-row content-footer">
+                      <div class="info-grid">
+                          <div>Дата начала периода</div>
+                          <div class="info-decimal" data-decimal-type="begin-date"></div>
+                          <div>Дата окончания периода</div>
+                          <div class="info-decimal" data-decimal-type="end-date"></div>
+                          <div>Общее количество домов</div>
+                          <div class="info-decimal" data-decimal-type="all-houses"></div>
+                          <div>Из них нераспечатано</div>
+                          <div class="info-decimal" data-decimal-type="not-printed-houses"></div>
+                          <div>Общее количество лицевых счетов</div>
+                          <div class="info-decimal" data-decimal-type="all-counts"></div>
+                          <div>Из них нераспечатано</div>
+                          <div class="info-decimal" data-decimal-type="not-printed-counts"></div>
+                          <div>Выбрано для печати домов</div>
+                          <div class="info-decimal" data-decimal-type="selected-houses">0</div>
+                          <div>Выбрано для печати счетов</div>
+                          <div class="info-decimal" data-decimal-type="selected-counts">0</div>
+                      </div>
+                      <button type="button" class="btn btn-secondary" id="btnPrint"><i class="fa fa-qrcode" aria-hidden="true"> Сформировать</i></button>
+                  </div>
+              </div>
+          </div>
+          <div class="tab-pane fade" id="printAreaTab" role="tabpanel" aria-labelledby="print-area-tab">
+              <div id="print-area">
+                  <div class="container-fluid pages-area"></div>
+              </div>
+              <div class="content-row content-footer">
+                  <button type="button" class="btn btn-secondary save-image-button" id="btnSavePdf" disabled><i class="fa fa-file-pdf-o" aria-hidden="true"> Сохранить в файл</i></button>
+              </div>
+          </div>
+          <div class="tab-pane fade" id="prefTab" role="tabpanel" aria-labelledby="pref-tab">
+              <div class="pref-title-area">
+                  <div class="pref-top-row-cell">
+                      <label for="jsonFile" class="form-label">Загрузка данных по платежам</label>
+                      <div class="input-group">
+                          <input class="form-control" type="text" id="jsonFile" placeholder="Выберите файл с данными по платежам" readonly>
+                          <button class="btn btn-outline-secondary" type="button"  id="btnDownload">
+                              <i class="fa fa-download" aria-hidden="true"></i>
+                          </button>
+                      </div>
+                  </div>
+                  <div class="pref-top-row-cell">
+                      <label for="outputPath" class="form-label">Путь для сохранения</label>
+                      <div class="input-group">
+                          <input class="form-control stored-pref" type="text" id="outputPath" placeholder="Укажите путь для сохранения квитанций" readonly data-field-name="output">
+                          <button class="btn btn-outline-secondary" type="button"  id="btnSelectOutputPath">
+                              <i class="fa fa-folder" aria-hidden="true"></i>
+                          </button>
+                      </div>
+                  </div>
+                  <h4>Организация исполнитель</h4>
+                  <h4>Получатель платежа</h4>
+              </div>
+              <div class="pref-tab">
+                  <div class="pref-detail-area">
+                      <label for="executorName" class="form-label">Наименование</label>
+                      <input class="form-control stored-pref" type="text" id="executorName" data-field-name="executor.name">
+                      <label for="executorPhone" class="form-label">Телефоны</label>
+                      <input class="form-control stored-pref" type="text" id="executorPhone" data-field-name="executor.phones">
+                      <label for="executorEmail" class="form-label">E-Mail</label>
+                      <input class="form-control stored-pref" type="text" id="executorEmail" data-field-name="executor.email">
+                      <label for="executorGisId" class="form-label">Идентификатор ГИС ЖКХ</label>
+                      <input class="form-control stored-pref" type="text" id="executorGisId" data-field-name="executor.gis_id">
+                      <label for="executorBank" class="form-label">Отделение банка</label>
+                      <input class="form-control stored-pref" type="text" id="executorBank" data-field-name="executor.bank">
+                      <label for="executorCAcc" class="form-label">Корреспондентский счет</label>
+                      <input class="form-control stored-pref" type="text" id="executorCAcc" data-field-name="executor.corr_acc">
+                  </div>
+                  <div class="pref-detail-area">
+                      <label for="executorAddress" class="form-label">Адрес</label>
+                      <input class="form-control stored-pref" type="text" id="executorAddress" data-field-name="executor.address">
+                      <label for="executorHttp" class="form-label">Сайт организации</label>
+                      <input class="form-control stored-pref" type="text" id="executorHttp" data-field-name="executor.site">
+                      <label for="executorTime" class="form-label">Время работы</label>
+                      <input class="form-control stored-pref" type="text" id="executorTime" data-field-name="executor.work_time">
+                      <label for="executorINN" class="form-label">ИНН</label>
+                      <input class="form-control stored-pref" type="text" id="executorINN" data-field-name="executor.inn">
+                      <label for="executorRAcc" class="form-label">Расчетный счет</label>
+                      <input class="form-control stored-pref" type="text" id="executorRAcc" data-field-name="executor.calc_acc">
+                      <label for="executorBIK" class="form-label">БИК</label>
+                      <input class="form-control stored-pref" type="text" id="executorBIK" data-field-name="executor.bik">
+                  </div>
+                  <div class="pref-detail-area">
+                      <label for="recipientName" class="form-label">Наименование</label>
+                      <input class="form-control stored-pref" type="text" id="recipientName" data-field-name="recipient.name">
+                      <label for="recipientINN" class="form-label">ИНН</label>
+                      <input class="form-control stored-pref" type="text" id="recipientINN" data-field-name="recipient.inn">
+                      <label for="recipientCAcc" class="form-label">Корреспондентский счет</label>
+                      <input class="form-control stored-pref" type="text" id="recipientCAcc" data-field-name="recipient.corr_acc">
+                      <label for="recipientKPP" class="form-label">КПП</label>
+                      <input class="form-control stored-pref" type="text" id="recipientKPP" data-field-name="recipient.kpp">
+                  </div>
+                  <div class="pref-detail-area">
+                      <label for="recipientBank" class="form-label">Отделение банка</label>
+                      <input class="form-control stored-pref" type="text" id="recipientBank" data-field-name="recipient.bank">
+                      <label for="recipientRAcc" class="form-label">Расчетный счет</label>
+                      <input class="form-control stored-pref" type="text" id="recipientRAcc" data-field-name="recipient.calc_acc">
+                      <label for="recipientBIC" class="form-label">БИК</label>
+                      <input class="form-control stored-pref" type="text" id="recipientBIC" data-field-name="recipient.bik">
+                  </div>
+              </div>
+              <button type="button" class="btn btn-secondary" id="btnSavePref"><i class="fa fa-save" aria-hidden="true"> Сохранить</i></button>
+          </div>
+          <div class="tab-pane fade" id="errorsTab" role="tabpanel" aria-labelledby="errors-tab">
+              <div id="errorList"></div>
+          </div>
+      </div>
+  </div>
+</body>
+</html>

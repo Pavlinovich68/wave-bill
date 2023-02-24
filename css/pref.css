@@ -1,0 +1,23 @@
+#prefTab{
+    margin: .5em;
+}
+.pref-title-area{
+    display: grid;
+    grid-template-columns: 50% 50%;
+}
+.pref-tab{
+    display: grid;
+    grid-template-columns: 25% 25% 25% 25%;
+    margin-bottom: 0.5em;
+}
+.pref-top-row-cell{
+    margin: 0 .5em 1em .5em
+}
+.pref-detail-area{
+    height: calc(100vh - 268px);
+    width: 100%;
+    padding: 0.5em 0.5em 0.5em 0.5em;
+}
+.tab-pane button{
+    float: right;
+}
