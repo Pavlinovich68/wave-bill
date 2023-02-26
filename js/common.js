@@ -4,9 +4,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const domtoimage = require('dom-to-image');
 const wnd = remote.getCurrentWindow();
-const PDFDocument = require('pdfkit');
-const blobStream = require('blob-stream');
-const fileSaver = require('file-saver');
+const { PDFDocument } = require('pdf-lib');
 
 const pdfCreator = (function(){
     async function printSinglePage(page){
@@ -25,43 +23,44 @@ const pdfCreator = (function(){
         if (pages.length === 0)
             return;
         let addr = pages[0].getAttribute('data-house-addr');
-        let blobArray = [];
-        for (const page of pages) {
-            let item = await printSinglePage(page);
-            blobArray.push(item);
+
+        if (!fs.existsSync(`${bills.getPrefs().output}\\${addr}`)){
+            fs.mkdirSync(`${bills.getPrefs().output}\\${addr}`);
         }
-        Promise.all(blobArray).then((data)=>{
-            // Здесь создается первая страница документа, поэтому добавлять нужно на одну меньше
-            const doc = new PDFDocument({size: 'A4', layout: 'portrait', bufferPages: true});
-            let stream = doc.pipe(blobStream());
-            for (let i = 1; i < data.length; i ++){
-                doc.addPage({size: 'A4', layout: 'portrait'});
-            }
-            const range = doc.bufferedPageRange();
-            for (let i = range.start; i < range.count; i++) {
-                doc.switchToPage(i);
-                paintSinglePage(doc, data[i]);
-            }
-            doc.end();
-            stream.on('finish', function() {
-                const result = stream.toBlobURL('application/pdf');
-                fileSaver.saveAs(result, `${bills.getPrefs().output}\\${addr}.pdf`);
-            });
-        });
+
+        let idx = 1;
+        let base64Data = null;
+        let imgNames = [];
+        for (const page of pages) {
+            let imageName = `${bills.getPrefs().output}\\${addr}\\${idx}.png`;
+            let item = await printSinglePage(page);
+            base64Data = item.replace(/^data:image\/png;base64,/, "");
+            await fs.writeFile(imageName, base64Data, 'base64', (err)=>{});
+            imgNames.push(imageName);
+            idx++;
+        }
+        //await createPDF({addr: addr, files: imgNames});
+        return true;
     };
-    function paintSinglePage(doc, data){
-        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#fff');
-        doc.image(data, 0, 6, {
-            fit: [850, doc.page.width],
-            align: 'left',
-            valign: 'top'
-        });
-        doc.page.margins = {
-            top: 0,
-            left: 0,
-            bottom: 0,
-            right: 0
-        };
+    async function createPDF(data){
+        const doc = await PDFDocument.create();
+
+        for (let i = 0; i < data.files.length; i++){
+            const page = doc.addPage();
+            let img = fs.readFileSync(data.files[i]);
+            img = await doc.embedPng(img);
+            let pageWidth = page.getWidth();
+            let factor = pageWidth / 1050;
+            page.drawImage(img, {
+                x: 0,
+                y: page.getHeight() - (img.height * factor),
+                width: img.width * factor,
+                height: img.height * factor
+            });
+        }
+
+        fs.writeFileSync(`${bills.getPrefs().output}\\${data.addr}.pdf`, await doc.save());
+        return true;
     }
     return Object.freeze({create} );
 })();
@@ -176,6 +175,7 @@ const bills =(function(){
         let obj = JSON.parse(fs.readFileSync(name, 'utf8'));
         buildHouseDict(obj);
     }
+    // Считывание с диска настроек и перечня домов
     function load(){
         if (fs.existsSync(`./pref/pref.json`)){
             storedPref = JSON.parse(fs.readFileSync(`./pref/pref.json`, 'utf8'));
@@ -202,10 +202,25 @@ const bills =(function(){
         preparedData.errors = data.errors;
         preparedData.preferences = data.preferences;
 
-        let html = '';
-
         let houses = Object.entries(data.houseDict);
         let notPrintedHouses = houses.map(i => i[1]).filter(i => i.printed === false).length;
+
+        buildHousesGrid();
+
+        document.querySelector('.info-decimal[data-decimal-type="begin-date"]').innerText = dateToString(data.preferences.beginDate);
+        document.querySelector('.info-decimal[data-decimal-type="end-date"]').innerText = dateToString(data.preferences.endDate);
+
+        document.querySelector('.info-decimal[data-decimal-type="all-houses"]').innerText = houses.length;
+        document.querySelector('.info-decimal[data-decimal-type="not-printed-houses"]').innerText = notPrintedHouses;
+
+        document.getElementById('errorList').innerHTML = '';
+        data.errors.forEach((item)=>{
+            setError(item)
+        })
+    }
+    function buildHousesGrid(){
+        let html = '';
+        let houses = Object.entries(preparedData.houseDict);
 
         let counts = 0;
         let notPrintedCounts = 0;
@@ -225,11 +240,8 @@ const bills =(function(){
                         </div>
                     </div>`;
         }
-        document.querySelector('.info-decimal[data-decimal-type="begin-date"]').innerText = dateToString(data.preferences.beginDate);
-        document.querySelector('.info-decimal[data-decimal-type="end-date"]').innerText = dateToString(data.preferences.endDate);
 
-        document.querySelector('.info-decimal[data-decimal-type="all-houses"]').innerText = houses.length;
-        document.querySelector('.info-decimal[data-decimal-type="not-printed-houses"]').innerText = notPrintedHouses;
+
         document.querySelector('.info-decimal[data-decimal-type="all-counts"]').innerText = counts;
         document.querySelector('.info-decimal[data-decimal-type="not-printed-counts"]').innerText = notPrintedCounts;
 
@@ -239,11 +251,6 @@ const bills =(function(){
         grid.querySelectorAll("input.form-check-input").forEach((elem) => {
             elem.addEventListener('click', checkHouseItem);
         });
-
-        document.getElementById('errorList').innerHTML = '';
-        data.errors.forEach((item)=>{
-            setError(item)
-        })
     }
     function setError(err){
         let area = document.getElementById('errorList');
@@ -267,7 +274,7 @@ const bills =(function(){
            }
         });
         let pages = document.querySelectorAll('.bill-item');
-        document.getElementById('btnSavePdf').disabled = pages.length === 0;
+        document.getElementById('btnCreateBills').disabled = pages.length === 0;
         if (pages.length === 0){
             return false;
         } else {
@@ -471,7 +478,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let btnDownload = document.getElementById('btnDownload');
     let btnOutputPath = document.getElementById('btnSelectOutputPath');
     let btnSavePref = document.getElementById('btnSavePref');
-    let btnSavePdf = document.getElementById('btnSavePdf');
+    let btnCreateBills = document.getElementById('btnCreateBills');
 
     btnMin.addEventListener('click', ()=>{
        wnd.minimize();
@@ -537,8 +544,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fs.writeFileSync(`./pref/pref.json`, json);
     });
 
-    btnSavePdf.addEventListener('click', async () => {
-        let pdfFile = await pdfCreator.create();
+    btnCreateBills.addEventListener('click', async () => {
+        let isOk = await pdfCreator.create();
     });
 
     btnPrint.addEventListener('click', ()=>{
@@ -554,14 +561,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let tab2 = document.getElementById('print-area-tab');
     tab2.addEventListener('click', () => bills.changeTab(tab2));
 
-    const triggerTabList = document.querySelectorAll('#myTab button')
+    const triggerTabList = document.querySelectorAll('#myTab button[data-bs-toggle="tab"]')
     triggerTabList.forEach(triggerEl => {
         const tabTrigger = new bootstrap.Tab(triggerEl)
 
         triggerEl.addEventListener('click', event => {
             event.preventDefault()
             tabTrigger.show()
-        })
+        });
+        // triggerEl.addEventListener('show.bs.tab', function (event) {
+        //     if (event.target === document.getElementById('print-area-tab')){
+        //         console.log('!!!');
+        //     }
+        // });
     })
 
     bills.load();

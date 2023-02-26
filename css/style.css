@@ -294,5 +294,6 @@ th {
     font-size: 24px;
 }
 .save-image-button{
+    margin-left: 10px;
     margin-top: 1em;
 }
