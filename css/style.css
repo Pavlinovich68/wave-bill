@@ -98,15 +98,24 @@ div.win-btn:active {
 
 .content-data-row{
     display: grid;
-    grid-template-columns: 50px 1fr 100px 50px;
+    grid-template-columns: 1fr 100px 30px 30px;
     height: 30px;
     border-bottom-color: #555;
     border-bottom-style: solid;
     border-bottom-width: 1px;
 }
+.tool-button{
+    font-size: 12px;
+    height: 25px;
+    width: 25px;
+    margin-top: 2px;
+    padding-left: 7px;
+    padding-top: 3px;
+}
 
 .acc-count {
     text-align: right;
+    padding-right: 10px;
 }
 
 .check-icon {
@@ -128,7 +137,7 @@ div.win-btn:active {
     height: 36px;
     position: absolute;
     display: grid;
-    grid-template-columns: 200px 100px 200px 100px;
+    grid-template-columns: 200px 100px;
     grid-template-rows: 12px 12px 12px 12px;
     font-size: 10px;
     color: #3DA9C2 !important;

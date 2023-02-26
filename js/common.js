@@ -19,10 +19,11 @@ const pdfCreator = (function(){
             });
     }
     async function create(){
-        let pages = document.querySelectorAll('.bill-item');
+        let area = document.querySelector('.pages-area');
+        let pages = area.querySelectorAll('.bill-item');
         if (pages.length === 0)
             return;
-        let addr = pages[0].getAttribute('data-house-addr');
+        let addr = area.getAttribute('data-house-addr');
 
         if (!fs.existsSync(`${bills.getPrefs().output}\\${addr}`)){
             fs.mkdirSync(`${bills.getPrefs().output}\\${addr}`);
@@ -30,24 +31,27 @@ const pdfCreator = (function(){
 
         let idx = 1;
         let base64Data = null;
-        let imgNames = [];
         for (const page of pages) {
             let imageName = `${bills.getPrefs().output}\\${addr}\\${idx}.png`;
             let item = await printSinglePage(page);
             base64Data = item.replace(/^data:image\/png;base64,/, "");
-            await fs.writeFile(imageName, base64Data, 'base64', (err)=>{});
-            imgNames.push(imageName);
+            await fs.writeFile(imageName, base64Data, 'base64');
             idx++;
         }
-        //await createPDF({addr: addr, files: imgNames});
         return true;
-    };
-    async function createPDF(data){
+    }
+    async function createPDF(addr){
+        let path = `${bills.getPrefs().output}\\${addr}`;
+        let dirExists = fs.existsSync(path);
+        if (!dirExists)
+            return false;
+        let filenames = fs.readdirSync(path);
+
         const doc = await PDFDocument.create();
 
-        for (let i = 0; i < data.files.length; i++){
+        for (let i = 0; i < filenames.length; i++){
             const page = doc.addPage();
-            let img = fs.readFileSync(data.files[i]);
+            let img = fs.readFileSync(`${path}\\${filenames[i]}`);
             img = await doc.embedPng(img);
             let pageWidth = page.getWidth();
             let factor = pageWidth / 1050;
@@ -59,10 +63,10 @@ const pdfCreator = (function(){
             });
         }
 
-        fs.writeFileSync(`${bills.getPrefs().output}\\${data.addr}.pdf`, await doc.save());
+        fs.writeFileSync(`${path}.pdf`, await doc.save());
         return true;
     }
-    return Object.freeze({create} );
+    return Object.freeze({create, createPDF} );
 })();
 const bills =(function(){
     const dataDir = './data';
@@ -203,15 +207,12 @@ const bills =(function(){
         preparedData.preferences = data.preferences;
 
         let houses = Object.entries(data.houseDict);
-        let notPrintedHouses = houses.map(i => i[1]).filter(i => i.printed === false).length;
-
-        buildHousesGrid();
 
         document.querySelector('.info-decimal[data-decimal-type="begin-date"]').innerText = dateToString(data.preferences.beginDate);
         document.querySelector('.info-decimal[data-decimal-type="end-date"]').innerText = dateToString(data.preferences.endDate);
-
         document.querySelector('.info-decimal[data-decimal-type="all-houses"]').innerText = houses.length;
-        document.querySelector('.info-decimal[data-decimal-type="not-printed-houses"]').innerText = notPrintedHouses;
+
+        buildHousesGrid();
 
         document.getElementById('errorList').innerHTML = '';
         data.errors.forEach((item)=>{
@@ -223,27 +224,18 @@ const bills =(function(){
         let houses = Object.entries(preparedData.houseDict);
 
         let counts = 0;
-        let notPrintedCounts = 0;
         for (const [key, value] of houses) {
             counts += Object.keys(value.data).length;
-            notPrintedCounts += Object.values(value.data).filter(i => i.printed === false).length;
-            html += `<div class="content-data-row" data-house-id="${key}">
-                        <div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" value="" data-count-length="${Object.keys(value.data).length}">
-                            </div>
-                        </div>
+            let be = billsExist(value.address, Object.keys(value.data).length);
+            html += `<div class="content-data-row" data-house-id="${key}" data-house-addr="${value.address}">                        
                         <div>${value.address}</div>
                         <div class="acc-count">${Object.keys(value.data).length} л.с.</div>
-                        <div class="icon check-icon" style=${value.printed ? "display:block" : "display:none"}>
-                            <i class="fa fa-check" aria-hidden="true"></i>
-                        </div>
+                        <button type="button" class="btn btn-secondary tool-button qr-generate"><i class="fa fa-qrcode"></i></button>
+                        <button type="button" class="btn btn-secondary tool-button pdf-print" style="${be ? "display:block" : "display:none"}"><i class="fa fa-file-pdf-o"></i></button>
                     </div>`;
         }
 
-
         document.querySelector('.info-decimal[data-decimal-type="all-counts"]').innerText = counts;
-        document.querySelector('.info-decimal[data-decimal-type="not-printed-counts"]').innerText = notPrintedCounts;
 
         let grid = document.getElementById('houseGrid');
         grid.innerHTML = html;
@@ -252,34 +244,19 @@ const bills =(function(){
             elem.addEventListener('click', checkHouseItem);
         });
     }
+    function billsExist(addr, cnt){
+        let dirExists = fs.existsSync(`${storedPref.output}\\${addr}`);
+        if (!dirExists)
+            return false;
+        let filenames = fs.readdirSync(`${storedPref.output}\\${addr}`);
+        return cnt === filenames.length;
+    }
     function setError(err){
         let area = document.getElementById('errorList');
         area.innerHTML += `<div class="alert alert-danger error-list-item" role="alert">${err}</div>`;
         let cnt = area.querySelectorAll('.error-list-item').length;
         let tab = document.getElementById('errors-tab');
         tab.innerText = `Ошибки (${cnt})`;
-    }
-    function print(){
-        let all = document.querySelectorAll('.form-check-input');
-        all.forEach((item)=>{
-           if (item.checked){
-               let row = item.closest('.content-data-row');
-               let id = row.getAttribute('data-house-id');
-               if (printHouse(id)){
-                   // Пометить распечатанным
-                   row.querySelector('.check-icon').style = 'display:block';
-                   item.checked = false;
-                   checkHouseItem();
-               }
-           }
-        });
-        let pages = document.querySelectorAll('.bill-item');
-        document.getElementById('btnCreateBills').disabled = pages.length === 0;
-        if (pages.length === 0){
-            return false;
-        } else {
-            return rewriteData();
-        }
     }
     function printHouse(id){
         let area = document.querySelector('.pages-area');
@@ -301,22 +278,15 @@ const bills =(function(){
            QRCode.toCanvas(qr, val);
         });
 
-        if (!result)
+        let btn = document.getElementById('btnCreateBills');
+        if (!result){
+            btn.disabled = true;
             return false;
-        houseData.printed = true;
-        return true;
-        // в PDF
-    }
-
-    function png(){
-        let page = document.querySelector('.bill-item');
-        domtoimage.toJpeg(page)
-            .then(function (blob) {
-                var link = document.createElement('a');
-                link.download = 'my-image-name.jpeg';
-                link.href = blob;
-                link.click();
-            });
+        } else {
+            houseData.printed = true;
+            btn.disabled = qrArr.length === 0;
+            return true;
+        }
     }
     function printBill(bill, key){
         let payments = serviseRows(bill);
@@ -388,6 +358,8 @@ const bills =(function(){
         </div>`;
         let area = document.querySelector('.pages-area');
         area.innerHTML += html;
+        area.setAttribute('data-house-addr', bill.AddressName);
+        area.setAttribute('data-house-id', bill.HouseInfoId);
 
         bill.printed = true;
         return true;
@@ -439,17 +411,6 @@ const bills =(function(){
     function period(){
         return `${months[preparedData.preferences.beginDate.month]} ${preparedData.preferences.beginDate.year} г.`
     }
-    function checkHouseItem(){
-        let grid = document.getElementById('houseGrid');
-        let selHouses = grid.querySelectorAll('input.form-check-input:checked');
-        let selCounts = 0;
-        selHouses.forEach((item)=>{
-           let cnt = item.getAttribute('data-count-length');
-           selCounts += parseInt(cnt);
-        });
-        document.querySelector('.info-decimal[data-decimal-type="selected-houses"]').innerText = selHouses.length;
-        document.querySelector('.info-decimal[data-decimal-type="selected-counts"]').innerText = selCounts;
-    }
     function changeTab(elem){
         let tabs = document.querySelectorAll('.nav-link');
         tabs.forEach((tab)=>{
@@ -464,7 +425,7 @@ const bills =(function(){
         return storedPref;
     }
 
-    return Object.freeze({readBills, load, print, changeTab, preparedData, getPrefs, storedPref, png, setError} );
+    return Object.freeze({readBills, load, printHouse, changeTab, preparedData, getPrefs, storedPref, setError} );
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -472,8 +433,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let btnMax = document.querySelector('.btn-max');
     let btnClose = document.querySelector('.btn_close');
     let iconBtnMax = btnMax.children[0];
-
-    let btnPrint = document.getElementById('btnPrint');
 
     let btnDownload = document.getElementById('btnDownload');
     let btnOutputPath = document.getElementById('btnSelectOutputPath');
@@ -546,13 +505,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCreateBills.addEventListener('click', async () => {
         let isOk = await pdfCreator.create();
-    });
-
-    btnPrint.addEventListener('click', ()=>{
-       if (bills.print()){
-            let triggerEl = document.querySelector('#myTab button[data-bs-target="#printAreaTab"]');
-            bootstrap.Tab.getInstance(triggerEl).show();
-       }
+        if (isOk){
+            let area = document.querySelector('.pages-area');
+            let houseId = area.getAttribute('data-house-id');
+            let row = document.querySelector(`.content-data-row[data-house-id="${houseId}"]`);
+            row.querySelector('button.pdf-print').style.display = 'block';
+        }
     });
 
     let tab1 = document.getElementById('house-list-tab');
@@ -577,6 +535,25 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
     bills.load();
+
+    let qrGenerateButtons = document.querySelectorAll('.qr-generate');
+    qrGenerateButtons.forEach((btn)=>{
+        btn.addEventListener('click', ()=>{
+            let id = btn.closest('.content-data-row').getAttribute('data-house-id');
+            if (bills.printHouse(id)){
+                let triggerEl = document.querySelector('#myTab button[data-bs-target="#printAreaTab"]');
+                bootstrap.Tab.getInstance(triggerEl).show();
+            }
+        });
+    });
+
+    let pdfPrintButtons = document.querySelectorAll('.pdf-print');
+    pdfPrintButtons.forEach((btn)=>{
+        btn.addEventListener('click', ()=>{
+            let addr = btn.closest('.content-data-row').getAttribute('data-house-addr');
+            pdfCreator.createPDF(addr);
+        });
+    });
 });
 
 window.addEventListener('resize', () => {
